@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html data-color-mode="light" data-dark-theme="dark" data-light-theme="light" lang="zh-CN">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="content-type" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <link href='https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/Primer/21.0.7/primer.css' rel='stylesheet' />
+    
+    <link rel="icon" href="https://github.githubassets.com/favicons/favicon.svg"><script>
+        let theme = localStorage.getItem("meek_theme") || "light";
+        document.documentElement.setAttribute("data-color-mode", theme);
+    </script>
+<meta name="description" content="# Python 可变对象与不可变对象全面总结
+
+## 1. 基本概念
+
+### 不可变对象 (Immutable Objects)
+- **定义**：创建后状态不能被修改的对象
+- **类型**：`int`, `float`, `str`, `tuple`
+- **特点**：任何'修改'操作都会创建新对象
+### 可变对象 (mutable Objects)
+- **定义**：创建后状态可以被修改的对象
+- **类型**：`list`, `dict`
+- **特点**：支持原地修改，对象标识保持不变
+
+## 2. 实现机制对比
+
+### Python 的限制方式
+```python
+# 不可变对象 - 通过接口限制
+s = 'hello'
+# s[0] = 'H'  # TypeError: 没有 __setitem__ 方法
+
+# 可变对象 - 提供修改接口
+lst = [1, 2, 3]
+lst[0] = 99  # 正常工作，有 __setitem__ 方法
+```
+
+### 与 C 语言 const 的本质区别
+|特性 | C语言 const | Python 不可变对象|
+|:---| :---:| :---|
+|限制层面|编译时类型系统|运行时对象行为|
+|内存保护|可能触发段错误|只是没有修改接口|
+|错误时机|运行时可能崩溃|立即抛出TypeError|
+|绕过方式|类型转换可绕过|无法绕过|
+
+## 3. 内存模型可视化
+
+### 不可变对象的内存模型
+```
+Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ a → 0x100  │──→│ 0x100: int(5)    │
+│ ├─ b → 0x100  │──→│ type: int        │
+│ ├─ s1 → 0x200 │──→│ value: 5         │
+│ └─ s2 → 0x200 │──→│ refcount: 2      │
+└─────────────────┘    └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x200: str('abc')│
+                       │ type: str       │
+                       │ value: 'abc'    │
+                       │ refcount: 2     │
+                       └─────────────────┘
+```
+### 可变对象的内存模型
+```
+Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ lst1 → 0x300│──→│ 0x300: list     │
+│ ├─ lst2 → 0x300│──→│ type: list      │
+│ └─ lst3 → 0x400│──→│ items: [0x100, 0x500] │
+└─────────────────┘    │ refcount: 2     │
+                       └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x100: int(1)   │
+                       │ 0x500: int(2)   │
+                       └─────────────────┘
+```
+
+# 4. 变量系统的本质
+## Python 变量 = 对象引用（智能指针）
+```
+# 变量名本质是指向对象的引用
+a = [1, 2, 3]  # a 是指向列表对象的引用
+b = a          # b 指向同一个对象
+
+print(a is b)  # True - 同一个对象
+print(id(a) == id(b))  # True - 相同的内存地址
+```
+## 变量赋值的真实过程
+1. 创建对象（或在堆上分配内存）
+2. 在命名空间中建立变量名到对象的映射
+3. 增加对象的引用计数
+
+# 5. 关键行为差异
+
+## 赋值操作的影响
+```python
+# 不可变对象 - 创建新对象
+x = 5
+print(f'Before: id(x) = {id(x)}')
+x = x + 1  # 创建新整数对象
+print(f'After: id(x) = {id(x)}')  # 不同的id
+
+# 可变对象 - 修改原对象
+lst = [1, 2, 3]
+print(f'Before: id(lst) = {id(lst)}')
+lst.append(4)  # 修改原对象
+print(f'After: id(lst) = {id(lst)}')  # 相同的id
+```
+## 函数参数传递
+```python
+def modify_immutable(x):
+    '''不可变参数 - 不影响原始值'''
+    x = x + 1  # 创建新对象
+    return x
+
+def modify_mutable(lst):
+    '''可变参数 - 会影响原始对象'''
+    lst.append(99)  # 修改原对象
+
+num = 5
+modify_immutable(num)
+print(num)  # 5 - 不变
+
+my_list = [1, 2, 3]
+modify_mutable(my_list)
+print(my_list)  # [1, 2, 3, 99] - 被修改
+```
+
+# 6. Python 的优化机制
+
+## 小整数缓存 (-5 到 256)
+```python
+a = 100
+b = 100
+print(a is b)  # True - 同一个缓存对象
+
+x = 1000
+y = 1000  
+print(x is y)  # False - 不同对象
+```
+
+## 字符串驻留
+```python
+s1 = 'hello'
+s2 = 'hello'
+print(s1 is s2)  # True - 字符串驻留
+
+s3 = 'hello world!'
+s4 = 'hello world!'
+print(s3 is s4)  # False - 长字符串不驻留
+```
+
+# 7. 实际应用注意事项
+## 常见的陷阱
+```python
+# 陷阱1：可变默认参数
+def bad_function(data=[]):  # 默认参数在定义时创建
+    data.append('default')
+    return data
+
+print(bad_function())  # ['default']
+print(bad_function())  # ['default', 'default'] - 意外！
+
+# 正确做法
+def good_function(data=None):
+    if data is None:
+        data = []  # 每次调用时创建新列表
+    data.append('default')
+    return data
+```
+
+# 8. 设计哲学总结
+## Python 的选择
+- **统一对象模型**：一切皆对象，变量都是引用
+- **接口级别限制**：通过不提供修改方法实现不可变性
+- **运行时安全**：清晰的错误信息，不会内存崩溃
+- **性能优化**：小对象缓存、字符串驻留
+## 与 C 的核心理念差异
+- C：信任程序员，提供底层内存控制
+- Python：安全第一，通过抽象隐藏复杂性
+
+# 9. 关键结论
+1. **Python 变量本质是对象引用**，类似于智能指针
+2. **不可变性通过接口设计实现**，不是内存保护
+3. **所有修改操作都有明确的方法支持**
+4. **理解这个机制对于避免常见陷阱至关重要**
+5. **Python 的设计在易用性和安全性之间取得了良好平衡**
+
+
+这种设计让 Python 既保持了高级语言的易用性，又通过清晰的抽象提供了可预测的行为，是 Python 哲学'显式优于隐式'的完美体现。">
+<meta property="og:title" content="CS61A 2.4 note">
+<meta property="og:description" content="# Python 可变对象与不可变对象全面总结
+
+## 1. 基本概念
+
+### 不可变对象 (Immutable Objects)
+- **定义**：创建后状态不能被修改的对象
+- **类型**：`int`, `float`, `str`, `tuple`
+- **特点**：任何'修改'操作都会创建新对象
+### 可变对象 (mutable Objects)
+- **定义**：创建后状态可以被修改的对象
+- **类型**：`list`, `dict`
+- **特点**：支持原地修改，对象标识保持不变
+
+## 2. 实现机制对比
+
+### Python 的限制方式
+```python
+# 不可变对象 - 通过接口限制
+s = 'hello'
+# s[0] = 'H'  # TypeError: 没有 __setitem__ 方法
+
+# 可变对象 - 提供修改接口
+lst = [1, 2, 3]
+lst[0] = 99  # 正常工作，有 __setitem__ 方法
+```
+
+### 与 C 语言 const 的本质区别
+|特性 | C语言 const | Python 不可变对象|
+|:---| :---:| :---|
+|限制层面|编译时类型系统|运行时对象行为|
+|内存保护|可能触发段错误|只是没有修改接口|
+|错误时机|运行时可能崩溃|立即抛出TypeError|
+|绕过方式|类型转换可绕过|无法绕过|
+
+## 3. 内存模型可视化
+
+### 不可变对象的内存模型
+```
+Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ a → 0x100  │──→│ 0x100: int(5)    │
+│ ├─ b → 0x100  │──→│ type: int        │
+│ ├─ s1 → 0x200 │──→│ value: 5         │
+│ └─ s2 → 0x200 │──→│ refcount: 2      │
+└─────────────────┘    └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x200: str('abc')│
+                       │ type: str       │
+                       │ value: 'abc'    │
+                       │ refcount: 2     │
+                       └─────────────────┘
+```
+### 可变对象的内存模型
+```
+Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ lst1 → 0x300│──→│ 0x300: list     │
+│ ├─ lst2 → 0x300│──→│ type: list      │
+│ └─ lst3 → 0x400│──→│ items: [0x100, 0x500] │
+└─────────────────┘    │ refcount: 2     │
+                       └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x100: int(1)   │
+                       │ 0x500: int(2)   │
+                       └─────────────────┘
+```
+
+# 4. 变量系统的本质
+## Python 变量 = 对象引用（智能指针）
+```
+# 变量名本质是指向对象的引用
+a = [1, 2, 3]  # a 是指向列表对象的引用
+b = a          # b 指向同一个对象
+
+print(a is b)  # True - 同一个对象
+print(id(a) == id(b))  # True - 相同的内存地址
+```
+## 变量赋值的真实过程
+1. 创建对象（或在堆上分配内存）
+2. 在命名空间中建立变量名到对象的映射
+3. 增加对象的引用计数
+
+# 5. 关键行为差异
+
+## 赋值操作的影响
+```python
+# 不可变对象 - 创建新对象
+x = 5
+print(f'Before: id(x) = {id(x)}')
+x = x + 1  # 创建新整数对象
+print(f'After: id(x) = {id(x)}')  # 不同的id
+
+# 可变对象 - 修改原对象
+lst = [1, 2, 3]
+print(f'Before: id(lst) = {id(lst)}')
+lst.append(4)  # 修改原对象
+print(f'After: id(lst) = {id(lst)}')  # 相同的id
+```
+## 函数参数传递
+```python
+def modify_immutable(x):
+    '''不可变参数 - 不影响原始值'''
+    x = x + 1  # 创建新对象
+    return x
+
+def modify_mutable(lst):
+    '''可变参数 - 会影响原始对象'''
+    lst.append(99)  # 修改原对象
+
+num = 5
+modify_immutable(num)
+print(num)  # 5 - 不变
+
+my_list = [1, 2, 3]
+modify_mutable(my_list)
+print(my_list)  # [1, 2, 3, 99] - 被修改
+```
+
+# 6. Python 的优化机制
+
+## 小整数缓存 (-5 到 256)
+```python
+a = 100
+b = 100
+print(a is b)  # True - 同一个缓存对象
+
+x = 1000
+y = 1000  
+print(x is y)  # False - 不同对象
+```
+
+## 字符串驻留
+```python
+s1 = 'hello'
+s2 = 'hello'
+print(s1 is s2)  # True - 字符串驻留
+
+s3 = 'hello world!'
+s4 = 'hello world!'
+print(s3 is s4)  # False - 长字符串不驻留
+```
+
+# 7. 实际应用注意事项
+## 常见的陷阱
+```python
+# 陷阱1：可变默认参数
+def bad_function(data=[]):  # 默认参数在定义时创建
+    data.append('default')
+    return data
+
+print(bad_function())  # ['default']
+print(bad_function())  # ['default', 'default'] - 意外！
+
+# 正确做法
+def good_function(data=None):
+    if data is None:
+        data = []  # 每次调用时创建新列表
+    data.append('default')
+    return data
+```
+
+# 8. 设计哲学总结
+## Python 的选择
+- **统一对象模型**：一切皆对象，变量都是引用
+- **接口级别限制**：通过不提供修改方法实现不可变性
+- **运行时安全**：清晰的错误信息，不会内存崩溃
+- **性能优化**：小对象缓存、字符串驻留
+## 与 C 的核心理念差异
+- C：信任程序员，提供底层内存控制
+- Python：安全第一，通过抽象隐藏复杂性
+
+# 9. 关键结论
+1. **Python 变量本质是对象引用**，类似于智能指针
+2. **不可变性通过接口设计实现**，不是内存保护
+3. **所有修改操作都有明确的方法支持**
+4. **理解这个机制对于避免常见陷阱至关重要**
+5. **Python 的设计在易用性和安全性之间取得了良好平衡**
+
+
+这种设计让 Python 既保持了高级语言的易用性，又通过清晰的抽象提供了可预测的行为，是 Python 哲学'显式优于隐式'的完美体现。">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://FATEXcalibur.github.io/post/CS61A%202.4%20note.html">
+<meta property="og:image" content="https://github.githubassets.com/favicons/favicon.svg">
+<title>CS61A 2.4 note</title>
+<link href="//unpkg.com/@wooorm/starry-night@2.1.1/style/both.css" rel="stylesheet" />
+
+
+</head>
+<style>
+body{box-sizing: border-box;min-width: 200px;max-width: 900px;margin: 20px auto;padding: 45px;font-size: 16px;font-family: sans-serif;line-height: 1.25;}
+#header{display:flex;padding-bottom:8px;border-bottom: 1px solid var(--borderColor-muted, var(--color-border-muted));margin-bottom: 16px;}
+#footer {margin-top:64px; text-align: center;font-size: small;}
+
+</style>
+
+<style>
+.postTitle{margin: auto 0;font-size:40px;font-weight:bold;}
+.title-right{display:flex;margin:auto 0 0 auto;}
+.title-right .circle{padding: 14px 16px;margin-right:8px;}
+#postBody{border-bottom: 1px solid var(--color-border-default);padding-bottom:36px;}
+#postBody hr{height:2px;}
+#cmButton{height:48px;margin-top:48px;}
+#comments{margin-top:64px;}
+.g-emoji{font-size:24px;}
+@media (max-width: 600px) {
+    body {padding: 8px;}
+    .postTitle{font-size:24px;}
+}
+.copy-feedback {
+    display: none;
+    position: absolute;
+    top: 10px;
+    right: 50px;
+    color: var(--color-fg-on-emphasis);
+    background-color: var(--color-fg-muted);
+    border-radius: 3px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+</style>
+
+
+
+
+<body>
+    <div id="header">
+<h1 class="postTitle">CS61A 2.4 note</h1>
+<div class="title-right">
+    <a href="https://FATEXcalibur.github.io" id="buttonHome" class="btn btn-invisible circle" title="首页">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathHome" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+    <a href="https://github.com/FATEXcalibur/FATEXcalibur.github.io/issues/2" target="_blank" class="btn btn-invisible circle" title="Issue">
+        <svg class="octicon" width="16" height="16">
+            <path id="pathIssue" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+    
+
+    <a class="btn btn-invisible circle" onclick="modeSwitch();" title="切换主题">
+        <svg class="octicon" width="16" height="16" >
+            <path id="themeSwitch" fill-rule="evenodd"></path>
+        </svg>
+    </a>
+
+</div>
+</div>
+    <div id="content">
+<div class="markdown-body" id="postBody"><h1>Python 可变对象与不可变对象全面总结</h1>
+<h2>1. 基本概念</h2>
+<h3>不可变对象 (Immutable Objects)</h3>
+<ul>
+<li><strong>定义</strong>：创建后状态不能被修改的对象</li>
+<li><strong>类型</strong>：<code class="notranslate">int</code>, <code class="notranslate">float</code>, <code class="notranslate">str</code>, <code class="notranslate">tuple</code></li>
+<li><strong>特点</strong>：任何"修改"操作都会创建新对象</li>
+</ul>
+<h3>可变对象 (mutable Objects)</h3>
+<ul>
+<li><strong>定义</strong>：创建后状态可以被修改的对象</li>
+<li><strong>类型</strong>：<code class="notranslate">list</code>, <code class="notranslate">dict</code></li>
+<li><strong>特点</strong>：支持原地修改，对象标识保持不变</li>
+</ul>
+<h2>2. 实现机制对比</h2>
+<h3>Python 的限制方式</h3>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 不可变对象 - 通过接口限制</span>
+<span class="pl-s1">s</span> <span class="pl-c1">=</span> <span class="pl-s">"hello"</span>
+<span class="pl-c"># s[0] = "H"  # TypeError: 没有 __setitem__ 方法</span>
+
+<span class="pl-c"># 可变对象 - 提供修改接口</span>
+<span class="pl-s1">lst</span> <span class="pl-c1">=</span> [<span class="pl-c1">1</span>, <span class="pl-c1">2</span>, <span class="pl-c1">3</span>]
+<span class="pl-s1">lst</span>[<span class="pl-c1">0</span>] <span class="pl-c1">=</span> <span class="pl-c1">99</span>  <span class="pl-c"># 正常工作，有 __setitem__ 方法</span></pre></div>
+<h3>与 C 语言 const 的本质区别</h3>
+<markdown-accessiblity-table><table role="table">
+<thead>
+<tr>
+<th align="left">特性</th>
+<th align="center">C语言 const</th>
+<th align="left">Python 不可变对象</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="left">限制层面</td>
+<td align="center">编译时类型系统</td>
+<td align="left">运行时对象行为</td>
+</tr>
+<tr>
+<td align="left">内存保护</td>
+<td align="center">可能触发段错误</td>
+<td align="left">只是没有修改接口</td>
+</tr>
+<tr>
+<td align="left">错误时机</td>
+<td align="center">运行时可能崩溃</td>
+<td align="left">立即抛出TypeError</td>
+</tr>
+<tr>
+<td align="left">绕过方式</td>
+<td align="center">类型转换可绕过</td>
+<td align="left">无法绕过</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<h2>3. 内存模型可视化</h2>
+<h3>不可变对象的内存模型</h3>
+<pre class="notranslate"><code class="notranslate">Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ a → 0x100  │──→│ 0x100: int(5)    │
+│ ├─ b → 0x100  │──→│ type: int        │
+│ ├─ s1 → 0x200 │──→│ value: 5         │
+│ └─ s2 → 0x200 │──→│ refcount: 2      │
+└─────────────────┘    └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x200: str("abc")│
+                       │ type: str       │
+                       │ value: "abc"    │
+                       │ refcount: 2     │
+                       └─────────────────┘
+</code></pre>
+<h3>可变对象的内存模型</h3>
+<pre class="notranslate"><code class="notranslate">Python 执行环境
+┌─────────────────┐    ┌─────────────────┐
+│ 命名空间        │    │    堆内存        │
+│ ├─ lst1 → 0x300│──→│ 0x300: list     │
+│ ├─ lst2 → 0x300│──→│ type: list      │
+│ └─ lst3 → 0x400│──→│ items: [0x100, 0x500] │
+└─────────────────┘    │ refcount: 2     │
+                       └─────────────────┘
+                       ┌─────────────────┐
+                       │ 0x100: int(1)   │
+                       │ 0x500: int(2)   │
+                       └─────────────────┘
+</code></pre>
+<h1>4. 变量系统的本质</h1>
+<h2>Python 变量 = 对象引用（智能指针）</h2>
+<pre class="notranslate"><code class="notranslate"># 变量名本质是指向对象的引用
+a = [1, 2, 3]  # a 是指向列表对象的引用
+b = a          # b 指向同一个对象
+
+print(a is b)  # True - 同一个对象
+print(id(a) == id(b))  # True - 相同的内存地址
+</code></pre>
+<h2>变量赋值的真实过程</h2>
+<ol>
+<li>创建对象（或在堆上分配内存）</li>
+<li>在命名空间中建立变量名到对象的映射</li>
+<li>增加对象的引用计数</li>
+</ol>
+<h1>5. 关键行为差异</h1>
+<h2>赋值操作的影响</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 不可变对象 - 创建新对象</span>
+<span class="pl-s1">x</span> <span class="pl-c1">=</span> <span class="pl-c1">5</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"Before: id(x) = <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">id</span>(<span class="pl-s1">x</span>)<span class="pl-kos">}</span></span>"</span>)
+<span class="pl-s1">x</span> <span class="pl-c1">=</span> <span class="pl-s1">x</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>  <span class="pl-c"># 创建新整数对象</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"After: id(x) = <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">id</span>(<span class="pl-s1">x</span>)<span class="pl-kos">}</span></span>"</span>)  <span class="pl-c"># 不同的id</span>
+
+<span class="pl-c"># 可变对象 - 修改原对象</span>
+<span class="pl-s1">lst</span> <span class="pl-c1">=</span> [<span class="pl-c1">1</span>, <span class="pl-c1">2</span>, <span class="pl-c1">3</span>]
+<span class="pl-en">print</span>(<span class="pl-s">f"Before: id(lst) = <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">id</span>(<span class="pl-s1">lst</span>)<span class="pl-kos">}</span></span>"</span>)
+<span class="pl-s1">lst</span>.<span class="pl-c1">append</span>(<span class="pl-c1">4</span>)  <span class="pl-c"># 修改原对象</span>
+<span class="pl-en">print</span>(<span class="pl-s">f"After: id(lst) = <span class="pl-s1"><span class="pl-kos">{</span><span class="pl-en">id</span>(<span class="pl-s1">lst</span>)<span class="pl-kos">}</span></span>"</span>)  <span class="pl-c"># 相同的id</span></pre></div>
+<h2>函数参数传递</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-k">def</span> <span class="pl-en">modify_immutable</span>(<span class="pl-s1">x</span>):
+    <span class="pl-s">"""不可变参数 - 不影响原始值"""</span>
+    <span class="pl-s1">x</span> <span class="pl-c1">=</span> <span class="pl-s1">x</span> <span class="pl-c1">+</span> <span class="pl-c1">1</span>  <span class="pl-c"># 创建新对象</span>
+    <span class="pl-k">return</span> <span class="pl-s1">x</span>
+
+<span class="pl-k">def</span> <span class="pl-en">modify_mutable</span>(<span class="pl-s1">lst</span>):
+    <span class="pl-s">"""可变参数 - 会影响原始对象"""</span>
+    <span class="pl-s1">lst</span>.<span class="pl-c1">append</span>(<span class="pl-c1">99</span>)  <span class="pl-c"># 修改原对象</span>
+
+<span class="pl-s1">num</span> <span class="pl-c1">=</span> <span class="pl-c1">5</span>
+<span class="pl-en">modify_immutable</span>(<span class="pl-s1">num</span>)
+<span class="pl-en">print</span>(<span class="pl-s1">num</span>)  <span class="pl-c"># 5 - 不变</span>
+
+<span class="pl-s1">my_list</span> <span class="pl-c1">=</span> [<span class="pl-c1">1</span>, <span class="pl-c1">2</span>, <span class="pl-c1">3</span>]
+<span class="pl-en">modify_mutable</span>(<span class="pl-s1">my_list</span>)
+<span class="pl-en">print</span>(<span class="pl-s1">my_list</span>)  <span class="pl-c"># [1, 2, 3, 99] - 被修改</span></pre></div>
+<h1>6. Python 的优化机制</h1>
+<h2>小整数缓存 (-5 到 256)</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">a</span> <span class="pl-c1">=</span> <span class="pl-c1">100</span>
+<span class="pl-s1">b</span> <span class="pl-c1">=</span> <span class="pl-c1">100</span>
+<span class="pl-en">print</span>(<span class="pl-s1">a</span> <span class="pl-c1">is</span> <span class="pl-s1">b</span>)  <span class="pl-c"># True - 同一个缓存对象</span>
+
+<span class="pl-s1">x</span> <span class="pl-c1">=</span> <span class="pl-c1">1000</span>
+<span class="pl-s1">y</span> <span class="pl-c1">=</span> <span class="pl-c1">1000</span>  
+<span class="pl-en">print</span>(<span class="pl-s1">x</span> <span class="pl-c1">is</span> <span class="pl-s1">y</span>)  <span class="pl-c"># False - 不同对象</span></pre></div>
+<h2>字符串驻留</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-s1">s1</span> <span class="pl-c1">=</span> <span class="pl-s">"hello"</span>
+<span class="pl-s1">s2</span> <span class="pl-c1">=</span> <span class="pl-s">"hello"</span>
+<span class="pl-en">print</span>(<span class="pl-s1">s1</span> <span class="pl-c1">is</span> <span class="pl-s1">s2</span>)  <span class="pl-c"># True - 字符串驻留</span>
+
+<span class="pl-s1">s3</span> <span class="pl-c1">=</span> <span class="pl-s">"hello world!"</span>
+<span class="pl-s1">s4</span> <span class="pl-c1">=</span> <span class="pl-s">"hello world!"</span>
+<span class="pl-en">print</span>(<span class="pl-s1">s3</span> <span class="pl-c1">is</span> <span class="pl-s1">s4</span>)  <span class="pl-c"># False - 长字符串不驻留</span></pre></div>
+<h1>7. 实际应用注意事项</h1>
+<h2>常见的陷阱</h2>
+<div class="highlight highlight-source-python"><pre class="notranslate"><span class="pl-c"># 陷阱1：可变默认参数</span>
+<span class="pl-k">def</span> <span class="pl-en">bad_function</span>(<span class="pl-s1">data</span><span class="pl-c1">=</span>[]):  <span class="pl-c"># 默认参数在定义时创建</span>
+    <span class="pl-s1">data</span>.<span class="pl-c1">append</span>(<span class="pl-s">"default"</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">data</span>
+
+<span class="pl-en">print</span>(<span class="pl-en">bad_function</span>())  <span class="pl-c"># ['default']</span>
+<span class="pl-en">print</span>(<span class="pl-en">bad_function</span>())  <span class="pl-c"># ['default', 'default'] - 意外！</span>
+
+<span class="pl-c"># 正确做法</span>
+<span class="pl-k">def</span> <span class="pl-en">good_function</span>(<span class="pl-s1">data</span><span class="pl-c1">=</span><span class="pl-c1">None</span>):
+    <span class="pl-k">if</span> <span class="pl-s1">data</span> <span class="pl-c1">is</span> <span class="pl-c1">None</span>:
+        <span class="pl-s1">data</span> <span class="pl-c1">=</span> []  <span class="pl-c"># 每次调用时创建新列表</span>
+    <span class="pl-s1">data</span>.<span class="pl-c1">append</span>(<span class="pl-s">"default"</span>)
+    <span class="pl-k">return</span> <span class="pl-s1">data</span></pre></div>
+<h1>8. 设计哲学总结</h1>
+<h2>Python 的选择</h2>
+<ul>
+<li><strong>统一对象模型</strong>：一切皆对象，变量都是引用</li>
+<li><strong>接口级别限制</strong>：通过不提供修改方法实现不可变性</li>
+<li><strong>运行时安全</strong>：清晰的错误信息，不会内存崩溃</li>
+<li><strong>性能优化</strong>：小对象缓存、字符串驻留</li>
+</ul>
+<h2>与 C 的核心理念差异</h2>
+<ul>
+<li>C：信任程序员，提供底层内存控制</li>
+<li>Python：安全第一，通过抽象隐藏复杂性</li>
+</ul>
+<h1>9. 关键结论</h1>
+<ol>
+<li><strong>Python 变量本质是对象引用</strong>，类似于智能指针</li>
+<li><strong>不可变性通过接口设计实现</strong>，不是内存保护</li>
+<li><strong>所有修改操作都有明确的方法支持</strong></li>
+<li><strong>理解这个机制对于避免常见陷阱至关重要</strong></li>
+<li><strong>Python 的设计在易用性和安全性之间取得了良好平衡</strong></li>
+</ol>
+<p>这种设计让 Python 既保持了高级语言的易用性，又通过清晰的抽象提供了可预测的行为，是 Python 哲学"显式优于隐式"的完美体现。</p></div>
+<div style="font-size:small;margin-top:8px;float:right;"></div>
+
+<button class="btn btn-block" type="button" onclick="openComments()" id="cmButton">评论</button>
+<div class="comments" id="comments"></div>
+
+</div>
+    <div id="footer"><div id="footer1">Copyright © <span id="copyrightYear"></span> <a href="https://FATEXcalibur.github.io">Saber Blog</a></div>
+<div id="footer2">
+    <span id="runday"></span><span>Powered by <a href="https://meekdai.com/Gmeek.html" target="_blank">Gmeek</a></span>
+</div>
+
+<script>
+var now=new Date();
+document.getElementById("copyrightYear").innerHTML=now.getFullYear();
+
+if(""!=""){
+    var startSite=new Date("");
+    var diff=now.getTime()-startSite.getTime();
+    var diffDay=Math.floor(diff/(1000*60*60*24));
+    document.getElementById("runday").innerHTML="网站运行"+diffDay+"天"+" • ";
+}
+</script></div>
+</body>
+<script>
+var IconList={'sun': 'M8 10.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM8 12a4 4 0 100-8 4 4 0 000 8zM8 0a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0V.75A.75.75 0 018 0zm0 13a.75.75 0 01.75.75v1.5a.75.75 0 01-1.5 0v-1.5A.75.75 0 018 13zM2.343 2.343a.75.75 0 011.061 0l1.06 1.061a.75.75 0 01-1.06 1.06l-1.06-1.06a.75.75 0 010-1.06zm9.193 9.193a.75.75 0 011.06 0l1.061 1.06a.75.75 0 01-1.06 1.061l-1.061-1.06a.75.75 0 010-1.061zM16 8a.75.75 0 01-.75.75h-1.5a.75.75 0 010-1.5h1.5A.75.75 0 0116 8zM3 8a.75.75 0 01-.75.75H.75a.75.75 0 010-1.5h1.5A.75.75 0 013 8zm10.657-5.657a.75.75 0 010 1.061l-1.061 1.06a.75.75 0 11-1.06-1.06l1.06-1.06a.75.75 0 011.06 0zm-9.193 9.193a.75.75 0 010 1.06l-1.06 1.061a.75.75 0 11-1.061-1.06l1.06-1.061a.75.75 0 011.061 0z', 'moon': 'M9.598 1.591a.75.75 0 01.785-.175 7 7 0 11-8.967 8.967.75.75 0 01.961-.96 5.5 5.5 0 007.046-7.046.75.75 0 01.175-.786zm1.616 1.945a7 7 0 01-7.678 7.678 5.5 5.5 0 107.678-7.678z', 'sync': 'M1.705 8.005a.75.75 0 0 1 .834.656 5.5 5.5 0 0 0 9.592 2.97l-1.204-1.204a.25.25 0 0 1 .177-.427h3.646a.25.25 0 0 1 .25.25v3.646a.25.25 0 0 1-.427.177l-1.38-1.38A7.002 7.002 0 0 1 1.05 8.84a.75.75 0 0 1 .656-.834ZM8 2.5a5.487 5.487 0 0 0-4.131 1.869l1.204 1.204A.25.25 0 0 1 4.896 6H1.25A.25.25 0 0 1 1 5.75V2.104a.25.25 0 0 1 .427-.177l1.38 1.38A7.002 7.002 0 0 1 14.95 7.16a.75.75 0 0 1-1.49.178A5.5 5.5 0 0 0 8 2.5Z', 'home': 'M6.906.664a1.749 1.749 0 0 1 2.187 0l5.25 4.2c.415.332.657.835.657 1.367v7.019A1.75 1.75 0 0 1 13.25 15h-3.5a.75.75 0 0 1-.75-.75V9H7v5.25a.75.75 0 0 1-.75.75h-3.5A1.75 1.75 0 0 1 1 13.25V6.23c0-.531.242-1.034.657-1.366l5.25-4.2Zm1.25 1.171a.25.25 0 0 0-.312 0l-5.25 4.2a.25.25 0 0 0-.094.196v7.019c0 .138.112.25.25.25H5.5V8.25a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 .75.75v5.25h2.75a.25.25 0 0 0 .25-.25V6.23a.25.25 0 0 0-.094-.195Z', 'github': 'M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z', 'copy': 'M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z', 'check': 'M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z'};
+var utterancesLoad=0;
+
+let themeSettings={
+    "dark": ["dark","moon","#00f0ff","dark-blue"],
+    "light": ["light","sun","#ff5000","github-light"],
+    "auto": ["auto","sync","","preferred-color-scheme"]
+};
+function changeTheme(mode, icon, color, utheme){
+    document.documentElement.setAttribute("data-color-mode",mode);
+    document.getElementById("themeSwitch").setAttribute("d",value=IconList[icon]);
+    document.getElementById("themeSwitch").parentNode.style.color=color;
+    if(utterancesLoad==1){utterancesTheme(utheme);}
+}
+function modeSwitch(){
+    let currentMode=document.documentElement.getAttribute('data-color-mode');
+    let newMode = currentMode === "light" ? "dark" : currentMode === "dark" ? "auto" : "light";
+    localStorage.setItem("meek_theme", newMode);
+    if(themeSettings[newMode]){
+        changeTheme(...themeSettings[newMode]);
+    }
+}
+function utterancesTheme(theme){
+    const message={type:'set-theme',theme: theme};
+    const iframe=document.getElementsByClassName('utterances-frame')[0];
+    iframe.contentWindow.postMessage(message,'https://utteranc.es');
+}
+if(themeSettings[theme]){changeTheme(...themeSettings[theme]);}
+console.log("\n %c Gmeek last https://github.com/Meekdai/Gmeek \n","padding:5px 0;background:#02d81d;color:#fff");
+</script>
+
+<script>
+document.getElementById("pathHome").setAttribute("d",IconList["home"]);
+document.getElementById("pathIssue").setAttribute("d",IconList["github"]);
+
+
+
+function openComments(){
+    cm=document.getElementById("comments");
+    cmButton=document.getElementById("cmButton");
+    cmButton.innerHTML="loading";
+    span=document.createElement("span");
+    span.setAttribute("class","AnimatedEllipsis");
+    cmButton.appendChild(span);
+
+    script=document.createElement("script");
+    script.setAttribute("src","https://utteranc.es/client.js");
+    script.setAttribute("repo","FATEXcalibur/FATEXcalibur.github.io");
+    script.setAttribute("issue-term","title");
+    
+    if(localStorage.getItem("meek_theme")=="dark"){script.setAttribute("theme","dark-blue");}
+    else if(localStorage.getItem("meek_theme")=="light") {script.setAttribute("theme","github-light");}
+    else{script.setAttribute("theme","preferred-color-scheme");}
+    
+    script.setAttribute("crossorigin","anonymous");
+    script.setAttribute("async","");
+    cm.appendChild(script);
+
+    int=self.setInterval("iFrameLoading()",200);
+}
+
+function iFrameLoading(){
+    var utterances=document.getElementsByClassName('utterances');
+    if(utterances.length==1){
+        if(utterances[0].style.height!=""){
+            utterancesLoad=1;
+            int=window.clearInterval(int);
+            document.getElementById("cmButton").style.display="none";
+            console.log("utterances Load OK");
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const createClipboardHTML = (codeContent, additionalClasses = '') => `
+        <pre class="notranslate"><code class="notranslate">${codeContent}</code></pre>
+        <div class="clipboard-container position-absolute right-0 top-0 ${additionalClasses}">
+            <clipboard-copy class="ClipboardButton btn m-2 p-0" role="button" style="display: inherit;">
+                <svg height="16" width="16" class="octicon octicon-copy m-2"><path d="${IconList["copy"]}"></path></svg>
+                <svg height="16" width="16" class="octicon octicon-check color-fg-success m-2 d-none"><path d="${IconList["check"]}"></path></svg>
+            </clipboard-copy>
+            <div class="copy-feedback">Copied!</div>
+        </div>
+    `;
+
+    const handleCodeElements = (selector = '') => {
+        document.querySelectorAll(selector).forEach(codeElement => {
+            const codeContent = codeElement.innerHTML;
+            const newStructure = document.createElement('div');
+            newStructure.className = 'snippet-clipboard-content position-relative overflow-auto';
+            newStructure.innerHTML = createClipboardHTML(codeContent);
+
+            const parentElement = codeElement.parentElement;
+            if (selector.includes('highlight')) {
+                parentElement.insertBefore(newStructure, codeElement.nextSibling);
+                parentElement.removeChild(codeElement);
+            } else {
+                parentElement.parentElement.replaceChild(newStructure, parentElement);
+            }
+        });
+    };
+
+    handleCodeElements('pre.notranslate > code.notranslate');
+    handleCodeElements('div.highlight > pre.notranslate');
+
+    let currentFeedback = null;
+    document.querySelectorAll('clipboard-copy').forEach(copyButton => {
+        copyButton.addEventListener('click', () => {
+            const codeContent = copyButton.closest('.snippet-clipboard-content').innerText;
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = codeContent;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+
+            const copyIcon = copyButton.querySelector('.octicon-copy');
+            const checkIcon = copyButton.querySelector('.octicon-check');
+            const copyFeedback = copyButton.nextElementSibling;
+
+            if (currentFeedback && currentFeedback !== copyFeedback) {currentFeedback.style.display = 'none';}
+            currentFeedback = copyFeedback;
+
+            copyIcon.classList.add('d-none');
+            checkIcon.classList.remove('d-none');
+            copyFeedback.style.display = 'block';
+            copyButton.style.borderColor = 'var(--color-success-fg)';
+
+            setTimeout(() => {
+                copyIcon.classList.remove('d-none');
+                checkIcon.classList.add('d-none');
+                copyFeedback.style.display = 'none';
+                copyButton.style.borderColor = '';
+            }, 2000);
+        });
+    });
+});
+
+</script>
+<script src='https://blog.meekdai.com/Gmeek/plugins/GmeekTOC.js'></script>
+
+</html>
