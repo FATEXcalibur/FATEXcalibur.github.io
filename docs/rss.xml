@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Saber Blog</title><link>https://FATEXcalibur.github.io</link><description>用于记录学习的博主</description><copyright>Saber Blog</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://github.githubassets.com/favicons/favicon.svg</url><title>avatar</title><link>https://FATEXcalibur.github.io</link></image><lastBuildDate>Wed, 01 Oct 2025 17:02:17 +0000</lastBuildDate><managingEditor>Saber Blog</managingEditor><ttl>60</ttl><webMaster>Saber Blog</webMaster><item><title>CS61A 2.4 note</title><link>https://FATEXcalibur.github.io/post/CS61A%202.4%20note.html</link><description># Python 可变对象与不可变对象全面总结
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/" version="2.0"><channel><title>Saber Blog</title><link>https://FATEXcalibur.github.io</link><description>用于记录学习的博主</description><copyright>Saber Blog</copyright><docs>http://www.rssboard.org/rss-specification</docs><generator>python-feedgen</generator><image><url>https://github.githubassets.com/favicons/favicon.svg</url><title>avatar</title><link>https://FATEXcalibur.github.io</link></image><lastBuildDate>Wed, 01 Oct 2025 17:04:54 +0000</lastBuildDate><managingEditor>Saber Blog</managingEditor><ttl>60</ttl><webMaster>Saber Blog</webMaster><item><title>CS61A 2.4 note</title><link>https://FATEXcalibur.github.io/post/CS61A%202.4%20note.html</link><description># Python 可变对象与不可变对象全面总结
 
 ## 1. 基本概念
 
@@ -180,9 +180,4 @@ def good_function(data=None):
 5. **Python 的设计在易用性和安全性之间取得了良好平衡**
 
 
-这种设计让 Python 既保持了高级语言的易用性，又通过清晰的抽象提供了可预测的行为，是 Python 哲学'显式优于隐式'的完美体现。</description><guid isPermaLink="true">https://FATEXcalibur.github.io/post/CS61A%202.4%20note.html</guid><pubDate>Wed, 01 Oct 2025 17:01:48 +0000</pubDate></item><item><title>TEST</title><link>https://FATEXcalibur.github.io/post/TEST.html</link><description># 标题一
-# 标题二
-# 标题三
-## 子标题一
-## 子标题二
-## 子标题三。</description><guid isPermaLink="true">https://FATEXcalibur.github.io/post/TEST.html</guid><pubDate>Mon, 29 Sep 2025 07:28:42 +0000</pubDate></item></channel></rss>
+这种设计让 Python 既保持了高级语言的易用性，又通过清晰的抽象提供了可预测的行为，是 Python 哲学'显式优于隐式'的完美体现。</description><guid isPermaLink="true">https://FATEXcalibur.github.io/post/CS61A%202.4%20note.html</guid><pubDate>Wed, 01 Oct 2025 17:01:48 +0000</pubDate></item></channel></rss>
